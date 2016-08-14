@@ -19,33 +19,13 @@ Take a raspbian install and set it up with my server configuration.
     -p    Pretend.
 EOF
 
-
-echo "Enter your pi's new user"
-read -p "User: " USER
-
-if ! grep -E "^${USER}:" /etc/passwd > /dev/null; then
-
-    info "user $USER not found, adding"
-
-    echo "Enter your pi's user password"
-    read -s -p "Password: " PASSWORD
-
-    # setup user
-    useradd -m -G adm,dialout,cdrom,sudo,audio,video,plugdev,games,users,input,netdev,spi,i2c,gpio -s /bin/bash $USER
-    echo "${USER}:${PASSWORD}" | chpasswd
-
-    success "user added"
-else
-    success "user already exists"
-fi
-
 function info () {
     echo -e '\033k'$1'\033\\'
-    printf "  [ \033[00;34m..\033[0m ] $1"
+    printf "  [ \033[00;34m..\033[0m ] $1 \n"
 }
 
 function user () {
-    printf "\r  [ \033[0;33m?\033[0m ] $1 "
+    printf "\r  [ \033[0;33m?\033[0m ] $1 \n"
 }
 
 function success () {
@@ -70,6 +50,25 @@ cryptsetup
 btrfs-tools
 rtorrent
 "
+
+echo "Enter your pi's new user"
+read -p "User: " USER
+
+if ! grep -E "^${USER}:" /etc/passwd > /dev/null; then
+
+    info "user $USER not found, adding"
+
+    echo "Enter your pi's user password"
+    read -s -p "Password: " PASSWORD
+
+    # setup user
+    useradd -m -G adm,dialout,cdrom,sudo,audio,video,plugdev,games,users,input,netdev,spi,i2c,gpio -s /bin/bash $USER
+    echo "${USER}:${PASSWORD}" | chpasswd
+
+    success "user added"
+else
+    success "user already exists"
+fi
 
 # ssh
 if grep -E "UsePAM\s+yes" /etc/ssh/sshd_config > /dev/zero; then
@@ -153,7 +152,7 @@ apt-get update -y && \
     apt-get dist-upgrade -y && \
     success "packages up-to-date"
 info "trying to update firmware"
-sudo rpi-update && success "firmware updated"
+rpi-update && success "firmware updated"
 
 for p in $PACKAGES; do
     if dpkg -s "${p}" > /dev/null; then
@@ -169,7 +168,7 @@ if ! grep -E "$MYSQLDB" /etc/mysql/my.cnf > /dev/null; then
     info "mysql looks unconfigured, adjusting"
     systemctl stop mysql
     sed -r -i 's|datadir(\s+)=(.*)|datadir\1= '$MYSQLDB'|' /etc/mysql/my.cnf
-    if ! [[ -f "$MYSQLDB" ]]; then
+    if ! [[ -d "$MYSQLDB" ]]; then
         info "skipping starting mysql, make sure your database is in place first"
     else
         systemctl start mysql
@@ -191,18 +190,55 @@ else
     success "apt sources present, skipping"
 fi
 
-if ! [[ -f /etc/letsencrypt/live ]]; then
+if ! [[ -d /etc/letsencrypt/live ]]; then
     info "lets encrypt!"
     apt-get install -t jessie-backports certbot
     sed -r -i 's/#ServerName.*/ServerName '$DOMAIN'/'
     certbot --apache
+    info "testing automatic renewal"
+
+    certbot
     success "encryption is great!"
 else
     success "already encrypted, great!"
 fi
 
+# certbot service
+if ! [[ -f /etc/systemd/system/certbot.service ]]; then
+    info "adding certbot renewal service"
+    cat <<EOF | tee /etc/systemd/system/certbot.service > /dev/null
+[Unit]
+Description=Let's Encrypt renewal
+
+[Service]
+Type=oneshot
+ExecStart=/usr/bin/certbot renew
+EOF
+    success "added certbot renewal service"
+else
+    success "certbot service already present"
+fi
+
+if ! [[ -f /etc/systemd/system/certbot.timer ]]; then
+    info "adding certbot renewal service"
+    cat <<EOF | tee /etc/systemd/system/certbot.timer > /dev/null
+[Unit]
+Description=Daily renewal of Let's Encrypt's certificates
+
+[Timer]
+OnCalendar=daily
+RandomizedDelaySec=1day
+Persistent=true
+
+[Install]
+WantedBy=timers.target
+EOF
+    systemctl start certbot.service && systemctl enable certbot.timer
+    success "added certbot renewal service"
+else
+    success "certbot service already present"
+fi
+
 # owncloud
 cp $DIR/owncloud/config.php /etc/owncloud/config.php
 success "configured owncloud!"
-
-#
