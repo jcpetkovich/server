@@ -38,6 +38,24 @@ function fail () {
     exit 1
 }
 
+FORCE=false
+PRETEND=false
+
+while getopts ":hfp" opt; do
+    case $opt in
+        h ) echo "$HELP"
+            exit 0;;
+        f ) FORCE=true
+            exit 0;;
+        p ) PRETEND=true
+            exit 0;;
+        ? ) echo "Invalid option -${OPTARG}..."
+            echo "$HELP"
+            exit 0;;
+    esac
+done
+shift $(($OPTIND - 1))
+
 NEWHOSTNAME=fruit
 MYSQLDB="/media/storage/mysql/"
 DOMAIN=ptk.io
@@ -242,3 +260,5 @@ fi
 # owncloud
 cp $DIR/owncloud/config.php /etc/owncloud/config.php
 success "configured owncloud!"
+
+exit 0
