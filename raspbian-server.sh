@@ -56,12 +56,11 @@ while getopts ":hfp" opt; do
 done
 shift $(($OPTIND - 1))
 
-NEWHOSTNAME=fruit
+NEWHOSTNAME=ptk.io
 MYSQLDB="/media/storage/mysql/"
 DOMAIN=ptk.io
 PACKAGES="
 apache2
-owncloud
 mysql-server
 screen
 cryptsetup
@@ -258,6 +257,24 @@ else
 fi
 
 # owncloud
+if ! dpkg -s owncloud > /dev/null; then
+
+    info "adding opensuse owncloud repo"
+    OWNCLOUDWORK=$(mktemp -d)
+    pushd $OWNCLOUDWORK
+    wget -nv https://download.owncloud.org/download/repositories/9.1/Debian_8.0/Release.key -O Release.key
+    apt-key add - < Release.key
+    popd
+    rm -r $OWNCLOUDWORK
+
+    echo 'deb http://download.owncloud.org/download/repositories/9.1/Debian_8.0/ /' > /etc/apt/sources.list.d/owncloud.list
+    apt-get update
+    info "installing owncloud"
+    apt-get install -y owncloud && success "successfully installed owncloud!"
+else
+    success "owncloud already installed"
+fi
+
 cp $DIR/owncloud/config.php /etc/owncloud/config.php
 success "configured owncloud!"
 
