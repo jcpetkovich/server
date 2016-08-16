@@ -7,6 +7,7 @@ $CONFIG = array (
   array (
     0 => 'localhost',
     0 => 'ptk.io',
+    0 => 'ptk.local',
   ),
   'datadirectory' => '/media/storage/owncloud',
   'overwrite.cli.url' => 'http://localhost:8080/owncloud',
