@@ -66,6 +66,7 @@ screen
 cryptsetup
 btrfs-tools
 rtorrent
+dnsmasq
 "
 
 echo "Enter your pi's new user"
