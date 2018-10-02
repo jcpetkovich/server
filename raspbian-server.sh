@@ -59,6 +59,7 @@ shift $(($OPTIND - 1))
 NEWHOSTNAME=ptk.io
 MYSQLDB="/media/storage/mysql/"
 DOMAIN=ptk.io
+DNSSERVERS="208.67.222.222 208.67.220.220"
 PACKAGES="
 apache2
 mysql-server
@@ -67,6 +68,7 @@ cryptsetup
 btrfs-tools
 rtorrent
 dnsmasq
+znc
 "
 
 echo "Enter your pi's new user"
@@ -263,12 +265,12 @@ if ! dpkg -s owncloud > /dev/null; then
     info "adding opensuse owncloud repo"
     OWNCLOUDWORK=$(mktemp -d)
     pushd $OWNCLOUDWORK
-    wget -nv https://download.owncloud.org/download/repositories/9.1/Debian_8.0/Release.key -O Release.key
+    wget -nv https://download.owncloud.org/download/repositories/production/Debian_8.0/Release.key -O Release.key
     apt-key add - < Release.key
     popd
     rm -r $OWNCLOUDWORK
 
-    echo 'deb http://download.owncloud.org/download/repositories/9.1/Debian_8.0/ /' > /etc/apt/sources.list.d/owncloud.list
+    echo 'deb http://download.owncloud.org/download/repositories/production/Debian_8.0/ /' > /etc/apt/sources.list.d/owncloud.list
     apt-get update
     info "installing owncloud"
     apt-get install -y owncloud && success "successfully installed owncloud!"
@@ -278,5 +280,21 @@ fi
 
 cp $DIR/owncloud/config.php /etc/owncloud/config.php
 success "configured owncloud!"
+
+
+# dnsmasq
+if grep -- '#no-resolv' /etc/dnsmasq.conf ; then
+   info "configuring dnsmasq"
+   sed -i 's/#no-resolv/no-resolv/' /etc/dnsmasq.conf
+
+   for ip in $DNSSERVERS ; do
+       sed -i "/no-resolv/ aserver=$ip" /etc/dnsmasq.conf
+   done
+
+   sed -i 's/#cache-size.*/cache-size=4096/' /etc/dnsmasq.conf
+   sed -i 's/#expand-hosts.*/expand-hosts/' /etc/dnsmasq.conf
+   systemctl enable dnsmasq.service
+   success "configured dnsmasq"
+fi
 
 exit 0
