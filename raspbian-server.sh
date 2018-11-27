@@ -91,9 +91,8 @@ else
 fi
 
 # ssh
-if grep -E "UsePAM\s+yes" /etc/ssh/sshd_config > /dev/zero; then
+if grep -E "UsePAM\s+yes" /etc/ssh/sshd_config > /dev/null; then
     info "first thing's first, fixing ssh config"
-    sed -i 's/UsePAM no'
     sed -r -i 's/^UsePAM\s+(\S+)/UsePAM no/' /etc/ssh/sshd_config
     sed -r -i 's/^.*PasswordAuthentication\s+(\S+)/PasswordAuthentication no/' /etc/ssh/sshd_config
     systemctl restart ssh.service
