@@ -69,6 +69,8 @@ btrfs-tools
 rtorrent
 dnsmasq
 znc
+certbot
+python-certbot-apache
 "
 
 echo "Enter your pi's new user"
@@ -125,24 +127,6 @@ else
     success "locale correct"
 fi
 
-# hdparm
-if ! grep -E "^/dev/sda" /etc/hdparm.conf > /dev/null; then
-    info "fixing hdparm configs"
-    cat <<EOF | tee -a /etc/hdparm.conf > /dev/null
-/dev/sda {
-    write_cache = on
-    spindown_time = 30
-    apm = 127
-    apm_battery = 127
-}
-EOF
-    systemctl enable hdparm
-    systemctl restart hdparm
-    success "fixed hdparm configs"
-else
-    success "hdparm configs correct"
-fi
-
 # hostname fixing
 if ! grep -E $NEWHOSTNAME /etc/hostname > /dev/null; then
     info "better hostname"
@@ -182,11 +166,37 @@ for p in $PACKAGES; do
     fi
 done
 
+# hdparm
+if ! grep -E "^/dev/sda" /etc/hdparm.conf > /dev/null; then
+    info "fixing hdparm configs"
+    cat <<EOF | tee -a /etc/hdparm.conf > /dev/null
+/dev/sda {
+    write_cache = on
+    spindown_time = 30
+    apm = 127
+    apm_battery = 127
+}
+
+/dev/sdb {
+    write_cache = on
+    spindown_time = 30
+    apm = 127
+    apm_battery = 127
+}
+EOF
+    systemctl enable hdparm
+    systemctl restart hdparm
+    success "fixed hdparm configs"
+else
+    success "hdparm configs correct"
+fi
+
+
 # configure mysql
-if ! grep -E "$MYSQLDB" /etc/mysql/my.cnf > /dev/null; then
+if ! grep -E "$MYSQLDB" /etc/mysql/mariadb.conf.d/50-server.cnf > /dev/null; then
     info "mysql looks unconfigured, adjusting"
     systemctl stop mysql
-    sed -r -i 's|datadir(\s+)=(.*)|datadir\1= '$MYSQLDB'|' /etc/mysql/my.cnf
+    sed -r -i 's|datadir(\s+)=(.*)|datadir\1= '$MYSQLDB'|' /etc/mysql/mariadb.conf.d/50-server.cnf
     if ! [[ -d "$MYSQLDB" ]]; then
         info "skipping starting mysql, make sure your database is in place first"
     else
@@ -199,19 +209,8 @@ fi
 
 # certbot
 # first we need backports for sources
-if ! grep jessie-backports /etc/apt/sources.list > /dev/null; then
-    info "adding deb-srcs"
-    echo "deb-src http://ftp.debian.org/debian jessie-backports main" >> /etc/apt/sources.list
-    echo "deb http://ftp.debian.org/debian jessie-backports main" >> /etc/apt/sources.list
-    apt-get update || fail "could not get sources, try something like:\ngpg --keyserver pgpkeys.mit.edu --recv-key 8B48AD6246925553 \ngpg -a --export 8B48AD6246925553 | sudo apt-key add - \n"
-    success "added apt sources"
-else
-    success "apt sources present, skipping"
-fi
-
 if ! [[ -d /etc/letsencrypt/live ]]; then
     info "lets encrypt!"
-    apt-get install -t jessie-backports certbot
     sed -r -i 's/#ServerName.*/ServerName '$DOMAIN'/'
     certbot --apache
     info "testing automatic renewal"
@@ -259,20 +258,20 @@ else
 fi
 
 # owncloud
-if ! dpkg -s owncloud > /dev/null; then
+if ! dpkg -s owncloud-files > /dev/null; then
 
     info "adding opensuse owncloud repo"
     OWNCLOUDWORK=$(mktemp -d)
     pushd $OWNCLOUDWORK
-    wget -nv https://download.owncloud.org/download/repositories/production/Debian_8.0/Release.key -O Release.key
+    wget -nv https://download.owncloud.org/download/repositories/production/Debian_9.0/Release.key -O Release.key
     apt-key add - < Release.key
     popd
     rm -r $OWNCLOUDWORK
 
-    echo 'deb http://download.owncloud.org/download/repositories/production/Debian_8.0/ /' > /etc/apt/sources.list.d/owncloud.list
+    echo 'deb http://download.owncloud.org/download/repositories/production/Debian_9.0/ /' > /etc/apt/sources.list.d/owncloud.list
     apt-get update
     info "installing owncloud"
-    apt-get install -y owncloud && success "successfully installed owncloud!"
+    apt-get install -y owncloud-files && success "successfully installed owncloud!"
 else
     success "owncloud already installed"
 fi
